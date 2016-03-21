@@ -16,9 +16,10 @@ mkdir -p /opt/soajs/
 cd /opt/soajs/
 npm install soajs.utilities
 cd /opt/soajs/soajs.utilities/lib/
-./dockerDeploy.sh
+./dockermachineDeploy.sh
 
 echo ""
 echo "Add these IPs to /etc/hosts or use the external IP:"
 IPS=$(hostname -I | awk {' print $1 '})
 echo "$IPS dashboard.soajs.org dashboard-api.soajs.org api.soajs.org api.mydomain.com"
+
