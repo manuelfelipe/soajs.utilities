@@ -1,7 +1,7 @@
-# brew install node012
-# node v0.12.12 needed
-#
-# make sure docker is working
+#!/bin/bash
+
+# Tested with Ubuntu 14.04.4
+# Automated install of SOAJS dockerdeploy.sh
 
 apt-get update
 apt-get install -y npm libkrb5-dev make g++ build-essential nodejs mongodb
