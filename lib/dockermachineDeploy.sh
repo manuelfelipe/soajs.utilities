@@ -4,14 +4,9 @@
 #
 # https://github.com/docker/machine/releases
 
-
-#no need for this env and param anymore, waiting to remove dependency from dashbaord
-[ ${SOAJS_DEPLOY_DIR} ] && LOC=${SOAJS_DEPLOY_DIR} || LOC='/Users/'
-
 GIT_BRANCH="develop"
 DATA_CONTAINER='soajsData'
-#IMAGE_PREFIX='soajsorg'
-IMAGE_PREFIX='keithwbacon'
+IMAGE_PREFIX='soajsorg'
 NGINX_CONTAINER='nginx'
 MASTER_DOMAIN='soajs.org'
 KEYSTORE_MACHINE="soajs-v-keystore"
@@ -277,12 +272,8 @@ function choices(){
       echo -n "What would you like to do? "
       read choice
       echo ""
-#      echo -n "Pull from NPM GIT or LOCAL? "
-#      read choicepull
       echo ""
       echo "Choice: $choice"
-#      echo "Pull from: $choicepull"
-choicepull="NPM"
       echo ""
       echo -n "Are you sure? y or n "
       read answerinput
@@ -322,13 +313,3 @@ choices
 gochoice
 
 echo "$INSTRUCT_MSG"
-
-
-
-
-
-
-
-
-
-
