@@ -134,6 +134,10 @@ function start(){
     local CONTROLLERIP=`docker inspect --format '{{ .NetworkSettings.Networks.soajsnet.IPAddress }}' soajs.controller`
     echo $'\n Starting NGINX Container "nginx" ... '
     docker run -d -p 80:80 -e "SOAJS_NX_CONTROLLER_IP_1=${CONTROLLERIP}" -e "SOAJS_NX_CONTROLLER_NB=1" -e "SOAJS_NX_API_DOMAIN=dashboard-api.${MASTER_DOMAIN}" -e "SOAJS_NX_SITE_DOMAIN=dashboard.${MASTER_DOMAIN}" -e "SOAJS_GIT_DASHBOARD_BRANCH="${BRANCH} --name ${NGINX_CONTAINER} --net=soajsnet ${IMAGE_PREFIX}/nginx bash -c '/opt/soajs/FILES/scripts/runNginx.sh'
+
+    #KWB example
+    docker run -d -p 8080:8080 -e VIRTUAL_HOST=foo.bar.com --name nginx-test --net=soajsnet nginx
+
     echo $'\n--------------------------'
 
     ###################################
@@ -284,7 +288,27 @@ function setupcloud(){
       read cloudchoice
     done
 }
+function setupProxyEnv(){
+    local machineName=${1}
+    local PROXYIP=`docker-machine ip ${machineName}`
+    cleanContainers ${machineName} "swarm"
+    echo $'\n2- Starging nginx-proxy Container "nginx-proxy" '${machineName}' '${PROXYIP}' ...'
 
+    #generate config
+    docker run -d --restart=always --name=docker-gen --net=soajsnet --env=DOCKER_HOST='${PROXYIP}:2376' --env="constraint:node==${machineName}" jwilder/docker-gen
+    #
+    #start nginx proxy
+    docker run -d --restart=always --name=nginx -p 80:80 --volumes-from=docker-gen nginx
+
+    #containers must use this:
+    # docker run -d -p 80:80 -e VIRTUAL_HOST=foo.bar.com --name nginx-test --net=soajsnet nginx
+
+
+    echo $'\n--------------------------'
+    echo $'\n nginx-proxy ip is: '${PROXYIP}
+    echo $'\n Proxy built'
+
+}
 function choices(){
     while [ "$answerinput" != "y" ]
      do
@@ -314,6 +338,7 @@ function gochoice(){
         createDockerMachine "soajs-dev"
         pullNeededImages "soajs-dev"
         pullNeededImages "soajs-dash"
+        setupProxyEnv "soajs-swarm-master"
         setupDashEnv "soajs-dash" "soajs-dev"
         setupDevEnv "soajs-dev"
     elif [ ${choice} == "2" ]; then
