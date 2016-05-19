@@ -27,15 +27,18 @@ function createContainer(){
     local REPO=${1}
     local BRANCH=${2}
     local OWNER="soajs"
-    local ENV='--dns='${SOAJS_DNS}' -e NODE_ENV=production -e SOAJS_ENV=dashboard -e SOAJS_PROFILE=/opt/soajs/FILES/profiles/profile.js -e SOAJS_SRV_AUTOREGISTERHOST=true -e SOAJS_MONGO_NB=1 -e SOAJS_MONGO_IP_1='${MACHINEIP}' -e SOAJS_GIT_OWNER='${OWNER}' -e SOAJS_GIT_REPO='${REPO}' -e SOAJS_GIT_BRANCH='${BRANCH}''
+    local ENV='-e NODE_ENV=production -e SOAJS_ENV=dashboard -e SOAJS_PROFILE=/opt/soajs/FILES/profiles/profile.js -e SOAJS_SRV_AUTOREGISTERHOST=true -e SOAJS_MONGO_NB=1 -e SOAJS_MONGO_IP_1='${MACHINEIP}' -e SOAJS_GIT_OWNER='${OWNER}' -e SOAJS_GIT_REPO='${REPO}' -e SOAJS_GIT_BRANCH='${BRANCH}''
 
     echo $'- Starting Controller Container '${REPO}' ...'
+
+echo ${SOAJS_DNS}
+
     if [ ${REPO} == "soajs.urac" ]; then
-        docker run -d ${ENV} -i -t --name ${REPO} --net=soajsnet ${IMAGE_PREFIX}/soajs bash -c "/etc/init.d/postfix start; cd /opt/soajs/FILES/deployer/; ./soajsDeployer.sh -T service -X deploy"
+        docker run -d --dns=${SOAJS_DNS} ${ENV} -i -t --name ${REPO} --net=soajsnet ${IMAGE_PREFIX}/soajs bash -c "/etc/init.d/postfix start; cd /opt/soajs/FILES/deployer/; ./soajsDeployer.sh -T service -X deploy"
     elif [ ${REPO} == "soajs.dashboard" ] && [ SOAJS_NO_NGINX=true ]; then
-        docker run -d ${ENV} -e SOAJS_NO_NGINX=${SOAJS_NO_NGINX} -i -t --name ${REPO} --net=soajsnet ${IMAGE_PREFIX}/soajs bash -c "cd /opt/soajs/FILES/deployer/; ./soajsDeployer.sh -T service -X deploy"
+        docker run -d --dns=${SOAJS_DNS} ${ENV} -e SOAJS_NO_NGINX=${SOAJS_NO_NGINX} -i -t --name ${REPO} --net=soajsnet ${IMAGE_PREFIX}/soajs bash -c "cd /opt/soajs/FILES/deployer/; ./soajsDeployer.sh -T service -X deploy"
     else
-        docker run -d ${ENV} -i -t --name ${REPO} --net=soajsnet ${IMAGE_PREFIX}/soajs bash -c "cd /opt/soajs/FILES/deployer/; ./soajsDeployer.sh -T service -X deploy"
+        docker run -d --dns=${SOAJS_DNS} ${ENV} -i -t --name ${REPO} --net=soajsnet ${IMAGE_PREFIX}/soajs bash -c "cd /opt/soajs/FILES/deployer/; ./soajsDeployer.sh -T service -X deploy"
     fi
 }
 function program_is_installed(){
@@ -76,6 +79,7 @@ function createDockerMachine(){
              --swarm \--swarm-discovery="consul://$(docker-machine ip ${KEYSTORE_MACHINE}):8500" \
              --engine-opt="cluster-store=consul://$(docker-machine ip ${KEYSTORE_MACHINE}):8500" \
              --engine-opt="cluster-advertise=eth1:2376" \
+             --engine-opt="dns=${SOAJS_DNS}" \
              ${machineName}
         fi
     else
@@ -148,7 +152,7 @@ function start(){
     local CONTROLLERIP=`docker inspect --format '{{ .NetworkSettings.Networks.soajsnet.IPAddress }}' soajs.controller`
     echo $'\nStarting NGINX Container "nginx" ... '
 
-    docker run -d -p 443:443 -p 80:80 -e "SOAJS_NX_CONTROLLER_IP_1=${CONTROLLERIP}" -e "SOAJS_NX_CONTROLLER_NB=1" -e "SOAJS_NX_API_DOMAIN=dashboard-api.${MASTER_DOMAIN}" -e "SOAJS_NX_SITE_DOMAIN=dashboard.${MASTER_DOMAIN}" -e "SOAJS_GIT_DASHBOARD_BRANCH="${BRANCH} --name ${NGINX_CONTAINER} --net=soajsnet ${IMAGE_PREFIX}/nginx bash -c "cd /opt/soajs/FILES/deployer/; ./soajsDeployer.sh -T nginx -X deploy"
+    docker run -d --dns=${SOAJS_DNS} -p 443:443 -p 80:80 -e "SOAJS_NX_CONTROLLER_IP_1=${CONTROLLERIP}" -e "SOAJS_NX_CONTROLLER_NB=1" -e "SOAJS_NX_API_DOMAIN=dashboard-api.${MASTER_DOMAIN}" -e "SOAJS_NX_SITE_DOMAIN=dashboard.${MASTER_DOMAIN}" -e "SOAJS_GIT_DASHBOARD_BRANCH="${BRANCH} --name ${NGINX_CONTAINER} --net=soajsnet ${IMAGE_PREFIX}/nginx bash -c "cd /opt/soajs/FILES/deployer/; ./soajsDeployer.sh -T nginx -X deploy"
 
     echo $'\n--------------------------'
 
@@ -174,7 +178,7 @@ function buildDashMongo(){
     local SOAJS_DATA_VLM='-v /data:/data -v /data/db:/data/db'
 
     echo $'\nStarging Mongo Container "soajsData" ...'
-    docker run -d -p 27017:27017 ${SOAJS_DATA_VLM} --name ${DATA_CONTAINER} --net=soajsnet mongo mongod --smallfiles
+    docker run --dns=${SOAJS_DNS} -d -p 27017:27017 ${SOAJS_DATA_VLM} --name ${DATA_CONTAINER} --net=soajsnet mongo mongod --smallfiles
     echo $'\n--------------------------'
     echo $'\nMongo ip is: '${MONGOIP}
 
@@ -213,12 +217,12 @@ function buildDevMongo(){
     local SOAJS_DATA_VLM='-v /data:/data -v /data/db:/data/db'
     if [ ${ADDSERVER} == "true" ]; then
        echo $'\nStarting Mongo Container' ${DATA_CONTAINER}' on '${machineName}' '${MONGOIP}' ...'
-       docker run -d -p 27017:27017 ${SOAJS_DATA_VLM} --name ${DATA_CONTAINER} --net=soajsnet --env="constraint:node==${machineName}" mongo mongod --smallfiles
+       docker run --dns=${SOAJS_DNS} -d -p 27017:27017 ${SOAJS_DATA_VLM} --name ${DATA_CONTAINER} --net=soajsnet --env="constraint:node==${machineName}" mongo mongod --smallfiles
        echo $'\n--------------------------'
        echo $'\nMongo ip is: '${MONGOIP}
     else
        echo $'\nStarting Mongo Container' ${DATA_CONTAINER}Dev' on '${machineName}' '${MONGOIP}' ...'
-       docker run -d -p 27017:27017 ${SOAJS_DATA_VLM} --name ${DATA_CONTAINER}Dev --net=soajsnet --env="constraint:node==${machineName}" mongo mongod --smallfiles
+       docker run --dns=${SOAJS_DNS} -d -p 27017:27017 ${SOAJS_DATA_VLM} --name ${DATA_CONTAINER}Dev --net=soajsnet --env="constraint:node==${machineName}" mongo mongod --smallfiles
        echo $'\n--------------------------'
        echo $'\nMongo ip is: '${MONGOIP}
     fi
@@ -286,7 +290,7 @@ function setupComm(){
         docker-machine start ${KEYSTORE_MACHINE}
         docker-machine regenerate-certs -f ${KEYSTORE_MACHINE}
     else
-         docker-machine create -d virtualbox ${KEYSTORE_MACHINE}
+         docker-machine create -d virtualbox --engine-opt="dns=${SOAJS_DNS}" ${KEYSTORE_MACHINE}
     fi
 
     cleanContainers ${KEYSTORE_MACHINE}
@@ -312,6 +316,7 @@ function setupSwarmMaster(){
          --swarm-discovery="consul://$(docker-machine ip ${KEYSTORE_MACHINE}):8500" \
          --engine-opt="cluster-store=consul://$(docker-machine ip ${KEYSTORE_MACHINE}):8500" \
          --engine-opt="cluster-advertise=eth1:2376" \
+         --engine-opt="dns=${SOAJS_DNS}" \
          ${machineName}
     fi
 
