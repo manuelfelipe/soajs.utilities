@@ -38,7 +38,12 @@ var dashboard = {
             },
             "docker": {
                 "socket": {
-                    "socketPath": "/var/run/docker.sock"
+                    "socketPath": "/var/run/docker.sock",
+                    "config" : {
+                        "HostConfig" : {
+                            "NetworkMode" : "soajsutilities_soajs_composer_net"
+                        }
+                    }
                 }
             }
         }

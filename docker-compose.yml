@@ -1,0 +1,103 @@
+version: '2'
+
+networks:
+  soajs_composer_net:
+    ipam:
+      driver: default
+      config:
+      - subnet: 10.20.30.0/24
+        gateway: 10.20.30.1
+
+services:
+  soajsData:
+    image: mongo
+    container_name: soajsData
+    entrypoint: mongod --smallfiles
+    networks:
+        - soajs_composer_net
+    ports:
+        - "27017"
+
+  soajsDataDev:
+    image: mongo
+    container_name: soajsDataDev
+    entrypoint: mongod --smallfiles
+    networks:
+        - soajs_composer_net
+    ports:
+        - "27017"
+
+  soajs.controller:
+    container_name: soajs.controller
+    image: soajsorg/soajs
+    entrypoint: bash -c "apt-get update && cd /opt/soajs/FILES/deployer/; ./soajsDeployer.sh -T service -X deploy"
+    env_file: ./common.env
+    environment:
+        - SOAJS_GIT_REPO=soajs.controller
+    links:
+        - soajsData
+        - soajsDataDev
+        - mongoImport
+    networks:
+        - soajs_composer_net
+
+  soajs.urac:
+    container_name: soajs.urac
+    image: soajsorg/soajs
+    entrypoint: bash -c "/etc/init.d/postfix start; apt-get update && cd /opt/soajs/FILES/deployer/; ./soajsDeployer.sh -T service -X deploy"
+    env_file: ./common.env
+    environment:
+        - SOAJS_GIT_REPO=soajs.urac
+    links:
+        - soajs.controller
+    networks:
+        - soajs_composer_net
+
+  soajs.dashboard:
+    container_name: soajs.dashboard
+    image: soajsorg/soajs
+    entrypoint: bash -c "apt-get update && cd /opt/soajs/FILES/deployer/; ./soajsDeployer.sh -T service -X deploy"
+    env_file: ./common.env
+    environment:
+        - SOAJS_GIT_REPO=soajs.dashboard
+        - SOAJS_GIT_OWNER=manuelfelipe
+        - SOAJS_GIT_BRANCH=k8s-cluster-support
+    links:
+        - soajs.controller
+    volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+        - soajs_composer_net
+
+  # TODO: implement custom domain support. The deployer script configures properly nginx when using
+  # different domain, but /opt/soajs/site/ui/config.js stills as mydomain set to soajs.org 
+  nginx:
+    container_name: soajs.nginx
+    image: soajsorg/nginx
+    entrypoint: bash -c "apt-get update && cd /opt/soajs/FILES/deployer/; ./soajsDeployer.sh -T nginx -X deploy"
+    env_file: ./common.env
+    environment:
+        - SOAJS_GIT_DASHBOARD_BRANCH=master
+#        - SOAJS_GIT_REPO=soajs.dashboard
+        - SOAJS_NX_CONTROLLER_IP_1=soajs.controller
+        - SOAJS_NX_CONTROLLER_NB=1
+        - SOAJS_NX_API_DOMAIN=dashboard-api.soajs.org
+        - SOAJS_NX_SITE_DOMAIN=dashboard.soajs.org
+    links:
+        - soajs.controller
+    ports:
+        - "80:80"
+    networks:
+        - soajs_composer_net
+
+  mongoImport:
+    image: ypcloud/mongo-node-importer:latest
+    container_name: soajsDataImporter
+    volumes:
+        - .:/soajs.utilities
+    command: sh -c 'apt-get update && cd /soajs.utilities/lib/ && npm install && node index data import provision soajsData DOCKER soajsDataDev'
+    links:
+        - soajsData
+        - soajsDataDev
+    networks:
+        - soajs_composer_net
